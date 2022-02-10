@@ -1,3 +1,4 @@
+import React from "react";
 import { StyleSheet, Text, SafeAreaView, Pressable, Image, View, FlatList } from "react-native";
 import { useState, useEffect } from "react";
 import { ResponseType, useAuthRequest } from "expo-auth-session";
@@ -6,12 +7,18 @@ import { REDIRECT_URI, SCOPES, CLIENT_ID, ALBUM_ID } from "./utils/constants";
 import Colors from "./Themes/colors"
 import SongItem from "./components/SongItem";
 import millisToMinutesAndSeconds from "./utils/millisToMinuteSeconds";
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import SongDetails from "./components/SongDetails";
+import SongPreview from "./components/SongPreview";
 
 // Endpoints for authorizing with Spotify
 const discovery = {
   authorizationEndpoint: "https://accounts.spotify.com/authorize",
   tokenEndpoint: "https://accounts.spotify.com/api/token"
 };
+
+const Stack = createStackNavigator();
 
 export default function App() {
   const [token, setToken] = useState("");  // when true, show list of songs
@@ -48,70 +55,118 @@ export default function App() {
     }
   }, [token]);
 
-  let contentDisplays = null;
-  if (token) {
-    const DATA = []
-    song_num = 1
-    for (const song in tracks) {
-      song_object = tracks[song]
-      let dict = {
-        index: song_num,
-        image: song_object["album"]["images"][2]["url"],
-        title: song_object["name"],
-        artist: song_object["album"]["artists"][0]["name"],
-        album: song_object["album"]["name"],
-        duration: millisToMinutesAndSeconds(song_object["duration_ms"]),
-        id: song_num.toString()
-      }
-      song_num += 1
-      DATA.push(dict)
+  // load data for songs
+  const DATA = []
+  song_num = 1
+  for (const song in tracks) {
+    song_object = tracks[song]
+    let dict = {
+      image: song_object["album"]["images"][2]["url"],
+      title: song_object["name"],
+      artist: song_object["album"]["artists"][0]["name"],
+      album: song_object["album"]["name"],
+      duration: millisToMinutesAndSeconds(song_object["duration_ms"]),
+      id: song_num.toString(),
+      external_url: song_object["external_urls"]["spotify"],
+      preview_url: song_object["preview_url"]
     }
+    song_num += 1
+    DATA.push(dict)
+  }
+  // render songs
+  const renderItem = (item, navigation) => (
+    <SongItem
+      image={item.image}
+      title={item.title}
+      artist={item.artist}
+      album={item.album}
+      duration={item.duration}
+      id={item.id}
+      external_url={item.external_url}
+      preview_url={item.preview_url} 
+      navigation={navigation}
+      />
+  );
 
-    const renderItem = (item) => (
-      <SongItem
-        index={item.index}
-        image={item.image}
-        title={item.title}
-        artist={item.artist}
-        album={item.album}
-        duration={item.duration}
-        id={item.id}/>
-    );
-
-    contentDisplays = (
-      <View>
+  function SongList({ navigation }) {
+    return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.titleRow}>
           <View style={styles.connect_view}>
             <Image source={require("./assets/spotify-logo.png")} style={styles.spotify_logo}/>
             <Text style={styles.connect_text}>My Top Tracks</Text>
           </View>
         </View>
-
+  
         <FlatList
           data={DATA} // the array of data that the FlatList displays
-          renderItem={({item}) => renderItem(item)} // function that renders each item
+          renderItem={({item}) => renderItem(item, navigation)} // function that renders each item
           keyExtractor={(item) => item.id} // unique key for each item
         />
-      </View>)
+      </SafeAreaView>
+    );
+  }
+
+  let contentDisplays = null;
+  if (token) {
+    contentDisplays = (
+      <NavigationContainer>
+        <Stack.Navigator
+        screenOptions= {{
+            headerStyle: {
+              backgroundColor: Colors.background,
+            },
+            headerTitleStyle: {
+              color: 'white',
+            }
+        }}>
+            <Stack.Screen 
+                name="Song List" 
+                options={{headerShown: false}}
+                component={SongList}
+            />
+            <Stack.Screen name="Song Details" component={SongDetails}
+                options={{
+                  title: 'Song details',
+                  headerTitleStyle: {
+                    color: "white"
+                  },
+                  headerBackTitle: "Back"
+                }}
+            />
+            <Stack.Screen name="Song Preview" component={SongPreview}
+                options={{
+                  title: 'Song preview',
+                  headerTitleStyle: {
+                    color: "white"
+                  },
+                  headerBackTitle: "Back"
+                }}
+            />
+        </Stack.Navigator>
+      </NavigationContainer>
+    )
   } else {
-    contentDisplays = <Pressable
-      onPress={() => {
-        promptAsync() // trigger spotify auth
-      }}
-      style={styles.pressable_connect}>
-        <View style={styles.connect_view}>
-          <Image source={require("./assets/spotify-logo.png")} style={styles.spotify_logo}/>
-          <Text style={styles.connect_text}>
-            CONNECT WITH SPOTIFY
-          </Text>
-        </View>
-      </Pressable>
+    contentDisplays = (
+      <SafeAreaView style={styles.container}>
+        <Pressable
+          onPress={() => {
+            promptAsync() // trigger spotify auth
+          }}
+          style={styles.pressable_connect}>
+            <View style={styles.connect_view}>
+              <Image source={require("./assets/spotify-logo.png")} style={styles.spotify_logo}/>
+              <Text style={styles.connect_text}>
+                CONNECT WITH SPOTIFY
+              </Text>
+            </View>
+        </Pressable>
+      </SafeAreaView>
+    )
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {contentDisplays}
-    </SafeAreaView>
+      contentDisplays
   );
 }
 
