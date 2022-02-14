@@ -166,7 +166,7 @@ export default function App() {
   }
 
   return (
-      contentDisplays
+      contentDisplays // this returns the content
   );
 }
 
